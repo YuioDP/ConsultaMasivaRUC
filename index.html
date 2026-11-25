@@ -4,11 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1220">
-  <meta name="description" content="Consulta masiva de RUC peruanos a partir del Padrón Reducido de SUNAT. Carga TXT o Excel y descarga los resultados en XLSX.">
+  <meta name="description" content="Consulta masiva de RUC peruanos a partir de una copia del Padrón Reducido de SUNAT. Carga TXT, Excel o pega una lista y descarga Excel o CSV.">
   <title>Consulta Masiva RUC | Perú</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -30,7 +29,7 @@
     <section class="hero">
       <div class="eyebrow"><span class="eyebrow-line"></span> CONSULTA DE CONTRIBUYENTES DEL PERÚ</div>
       <h1>Consulta cientos de RUC.<br><span>En una sola operación.</span></h1>
-      <p class="hero-copy">Carga tu archivo, cruza los números con el Padrón Reducido de SUNAT y descarga un Excel ordenado con los datos encontrados.</p>
+      <p class="hero-copy">Carga un archivo o pega tu lista, cruza los números con la copia del Padrón Reducido de SUNAT y descarga los resultados en Excel o CSV.</p>
       <div class="hero-points">
         <span><i class="check-icon">✓</i> Sin registro</span>
         <span><i class="check-icon">✓</i> Sin instalar programas</span>
@@ -41,34 +40,51 @@
     <section class="workspace" aria-label="Herramienta de consulta masiva">
       <div class="section-heading">
         <div>
-          <div class="step-label">01 <span>· CARGA DE ARCHIVO</span></div>
+          <div class="step-label">01 <span>· ENTRADA DE DATOS</span></div>
           <h2>Prepara tu consulta</h2>
         </div>
-        <span class="format-badge">TXT · XLS · XLSX · XLSM</span>
+        <span class="format-badge">TXT · EXCEL · PEGAR TEXTO</span>
       </div>
 
-      <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
-        <input id="fileInput" type="file" accept=".txt,.xls,.xlsx,.xlsm,.xlsb,.csv" hidden>
-        <span class="upload-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        <strong id="dropTitle">Arrastra tu archivo aquí</strong>
-        <span class="drop-subtitle" id="dropSubtitle">o <span class="browse-link">selecciona desde tu equipo</span></span>
-        <span class="drop-footnote">En TXT: un RUC por línea. En Excel: columna llamada RUC o primera columna.</span>
-      </label>
+      <div class="mode-tabs" role="tablist" aria-label="Forma de ingresar los RUC">
+        <button class="mode-tab active" id="fileModeButton" type="button" role="tab" aria-selected="true" aria-controls="fileModePanel"> <span aria-hidden="true">▤</span> Subir archivo</button>
+        <button class="mode-tab" id="textModeButton" type="button" role="tab" aria-selected="false" aria-controls="textModePanel"><span aria-hidden="true">✎</span> Pegar o escribir RUC</button>
+      </div>
 
-      <div class="file-card hidden" id="fileCard">
-        <div class="file-type-icon" id="fileIcon">TXT</div>
-        <div class="file-info">
-          <strong id="fileName">archivo.txt</strong>
-          <span id="fileMeta">0 RUC detectados</span>
+      <div id="fileModePanel" role="tabpanel" aria-labelledby="fileModeButton">
+        <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
+          <input id="fileInput" type="file" accept=".txt,.csv,.xls,.xlsx,.xlsm,.xlsb" hidden>
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <strong id="dropTitle">Arrastra tu archivo aquí</strong>
+          <span class="drop-subtitle" id="dropSubtitle">o <span class="browse-link">selecciona desde tu equipo</span></span>
+          <span class="drop-footnote">TXT o CSV: un RUC por línea. Excel: columna llamada RUC o primera columna.</span>
+        </label>
+
+        <div class="file-card hidden" id="fileCard">
+          <div class="file-type-icon" id="fileIcon">TXT</div>
+          <div class="file-info">
+            <strong id="fileName">archivo.txt</strong>
+            <span id="fileMeta">0 RUC detectados</span>
+          </div>
+          <button class="icon-button" id="removeFile" type="button" aria-label="Quitar archivo" title="Quitar archivo">×</button>
         </div>
-        <button class="icon-button" id="removeFile" type="button" aria-label="Quitar archivo" title="Quitar archivo">×</button>
+      </div>
+
+      <div id="textModePanel" class="paste-panel hidden" role="tabpanel" aria-labelledby="textModeButton">
+        <label class="paste-label" for="rucTextInput">Pega o escribe tu lista de RUC</label>
+        <textarea id="rucTextInput" class="ruc-textarea" rows="8" spellcheck="false" placeholder="20100047218&#10;20512345678&#10;20601234567"></textarea>
+        <div class="paste-hint-row">
+          <span>Admite un RUC por línea o números separados por espacios, comas o punto y coma.</span>
+          <span id="pasteCount">0 registros detectados</span>
+        </div>
+        <button id="prepareTextButton" class="secondary-button" type="button">Preparar lista</button>
       </div>
 
       <div class="input-note" id="inputNote">
         <span class="info-icon">i</span>
-        <span>Se conserva el orden del archivo y se incluyen los RUC repetidos, inválidos o que no aparezcan en el padrón.</span>
+        <span>Se conserva el orden original y se incluyen los duplicados, los formatos inválidos y los números que no aparezcan en el padrón.</span>
       </div>
 
       <button id="startButton" class="primary-button" type="button" disabled>
@@ -96,8 +112,10 @@
       <div class="stats-grid">
         <div class="stat-card"><span class="stat-label">Filas procesadas</span><strong id="statTotal">0</strong></div>
         <div class="stat-card stat-found"><span class="stat-label">Encontrados</span><strong id="statFound">0</strong></div>
+        <div class="stat-card stat-internal"><span class="stat-label">Identificadores internos</span><strong id="statInternal">0</strong></div>
+        <div class="stat-card stat-baja"><span class="stat-label">Baja definitiva</span><strong id="statBaja">0</strong></div>
         <div class="stat-card stat-missing"><span class="stat-label">No encontrados</span><strong id="statMissing">0</strong></div>
-        <div class="stat-card"><span class="stat-label">Formato inválido</span><strong id="statInvalid">0</strong></div>
+        <div class="stat-card stat-invalid"><span class="stat-label">Formato inválido</span><strong id="statInvalid">0</strong></div>
       </div>
       <div class="preview-card">
         <div class="preview-header">
@@ -106,24 +124,30 @@
         </div>
         <div class="table-scroll">
           <table>
-            <thead><tr><th>RUC</th><th>RAZÓN SOCIAL</th><th>ESTADO</th><th>CONDICIÓN</th><th>RESULTADO</th></tr></thead>
+            <thead><tr><th>RUC / NÚMERO</th><th>RAZÓN SOCIAL</th><th>ESTADO</th><th>CONDICIÓN</th><th>DOMICILIO FISCAL</th><th>RESULTADO</th></tr></thead>
             <tbody id="previewBody"></tbody>
           </table>
         </div>
       </div>
-      <button id="downloadButton" class="download-button" type="button">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 17v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Descargar resultados en Excel
-      </button>
-      <p class="download-caption">El archivo contiene las hojas «Resultados» y «Resumen».</p>
+      <div class="download-actions">
+        <button id="downloadExcelButton" class="download-button" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 17v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Descargar Excel (.xlsx)
+        </button>
+        <button id="downloadCsvButton" class="csv-button" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 17v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Descargar CSV (.csv)
+        </button>
+      </div>
+      <p class="download-caption">Excel incluye las hojas «Resultados» y «Resumen», colores por tipo de resultado y encabezado inmovilizado. CSV incluye los datos de la hoja «Resultados».</p>
     </section>
 
     <section class="how-section">
       <div class="step-label">CÓMO FUNCIONA</div>
       <div class="how-grid">
-        <article class="how-item"><span class="how-number">01</span><div><strong>Carga tu lista</strong><p>Sube un TXT o un libro de Excel que contenga los RUC que deseas consultar.</p></div></article>
+        <article class="how-item"><span class="how-number">01</span><div><strong>Ingresa tu lista</strong><p>Sube un TXT o Excel, o pega directamente los RUC en el cuadro de texto.</p></div></article>
         <article class="how-item"><span class="how-number">02</span><div><strong>Cruce automático</strong><p>La página agrupa los RUC y descarga los fragmentos de datos que necesita.</p></div></article>
-        <article class="how-item"><span class="how-number">03</span><div><strong>Descarga el Excel</strong><p>Obtén una hoja con cada fila en su orden original y un resumen de la consulta.</p></div></article>
+        <article class="how-item"><span class="how-number">03</span><div><strong>Descarga los resultados</strong><p>Obtén un Excel con formato y filtros, o un CSV para utilizarlo en otras aplicaciones.</p></div></article>
       </div>
     </section>
 
