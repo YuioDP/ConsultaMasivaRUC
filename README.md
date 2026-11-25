@@ -24,6 +24,10 @@ Para no descargar el padrón completo en cada visita, la aplicación consulta el
 
 La aplicación no llama a una API oficial de consulta individual ni verifica en tiempo real el estado actual del contribuyente. Los datos son una copia del padrón y pueden no reflejar cambios recientes. Un resultado «No encontrado en el padrón» no demuestra por sí solo que el RUC sea inexistente.
 
+### Respaldo ante errores del CDN
+
+Cada fragmento se solicita primero a jsDelivr. Si la descarga responde con HTTP 403/429, otro error HTTP, un fallo de red o una respuesta JSON inválida, la aplicación intenta obtener el mismo archivo desde GitHub Raw. Se consultan como máximo dos fragmentos simultáneamente para moderar el volumen de solicitudes. Si ambas fuentes fallan, la consulta se detiene y no genera un Excel incompleto. Esto mejora la tolerancia a fallos, pero no elimina la dependencia de servicios externos.
+
 ## Privacidad
 
 El archivo de entrada se lee y procesa en el navegador; no se carga en un servidor de esta aplicación. Para consultar, el navegador solicita al CDN los fragmentos correspondientes a los prefijos de cinco dígitos necesarios. Por tanto, el proveedor del CDN puede registrar esas solicitudes. El sitio no almacena las listas ni los archivos Excel generados.

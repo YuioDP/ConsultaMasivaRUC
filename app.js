@@ -1,14 +1,26 @@
 (() => {
   "use strict";
 
-  const DATA_BASE = "https://cdn.jsdelivr.net/gh/alb3rt0ru1z/tribio-padron-ruc@main";
-  const MANIFEST_URL = `${DATA_BASE}/manifest.json`;
+  // Fuente primaria: jsDelivr. Respaldo: GitHub Raw, por si el CDN devuelve
+  // HTTP 403/429, presenta una incidencia o no puede entregar un fragmento.
+  const DATA_SOURCES = [
+    {
+      name: "jsDelivr",
+      base: "https://cdn.jsdelivr.net/gh/alb3rt0ru1z/tribio-padron-ruc@main",
+    },
+    {
+      name: "GitHub Raw",
+      base: "https://raw.githubusercontent.com/alb3rt0ru1z/tribio-padron-ruc/main",
+    },
+  ];
   const OFFICIAL_SOURCE = "https://www.sunat.gob.pe/descargaPRR/mrc137_padron_reducido.html";
   const MIRROR_SOURCE = "https://github.com/alb3rt0ru1z/tribio-padron-ruc";
   const PREFIX_LENGTH = 5;
   const VALID_RUC_PREFIXES = new Set(["10", "15", "16", "17", "20"]);
   const MAX_FILE_SIZE = 25 * 1024 * 1024;
-  const CONCURRENCY = 3;
+  // Menos solicitudes simultáneas reduce la probabilidad de respuestas 403
+  // al consultar listas repartidas entre muchos prefijos.
+  const CONCURRENCY = 2;
 
   const el = (id) => document.getElementById(id);
   const state = {
@@ -226,24 +238,77 @@
     }
   }
 
-  async function fetchJson(url) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    try {
-      const response = await fetch(url, { cache: "no-store", signal: controller.signal });
-      if (!response.ok) {
-        const error = new Error(`La fuente de datos respondió HTTP ${response.status}.`);
-        error.status = response.status;
-        throw error;
+  async function fetchJsonFromSources(path, options = {}) {
+    const {
+      cache = "force-cache",
+      version = "",
+      missingIsNull = false,
+      timeoutMs = 30000,
+    } = options;
+    const failures = [];
+    let allResponsesWere404 = true;
+
+    for (const source of DATA_SOURCES) {
+      const suffix = version ? `?v=${encodeURIComponent(version)}` : "";
+      const url = `${source.base}/${path}${suffix}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          cache,
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        });
+
+        if (response.status === 404) {
+          failures.push(`${source.name}: HTTP 404`);
+          continue;
+        }
+
+        allResponsesWere404 = false;
+        if (!response.ok) {
+          let responseHint = "";
+          try {
+            responseHint = (await response.text()).replace(/\s+/g, " ").slice(0, 140);
+          } catch {
+            // El cuerpo de error puede no estar disponible.
+          }
+          failures.push(`${source.name}: HTTP ${response.status}${responseHint ? ` (${responseHint})` : ""}`);
+          continue;
+        }
+
+        try {
+          return await response.json();
+        } catch {
+          failures.push(`${source.name}: respuesta JSON inválida`);
+        }
+      } catch (error) {
+        allResponsesWere404 = false;
+        failures.push(
+          `${source.name}: ${error.name === "AbortError" ? "tiempo de espera agotado" : (error.message || "error de conexión")}`,
+        );
+      } finally {
+        clearTimeout(timeout);
       }
-      return await response.json();
-    } finally {
-      clearTimeout(timeout);
     }
+
+    if (missingIsNull && allResponsesWere404 && failures.length === DATA_SOURCES.length) {
+      return null;
+    }
+
+    const detail = failures.length ? failures.join("; ") : "sin respuesta de los distribuidores";
+    throw new Error(
+      `No se pudo obtener ${path}. Se intentaron las fuentes disponibles (${detail}). ` +
+      "Puede tratarse de una restricción temporal del CDN o de un problema de conexión. Vuelve a intentarlo en unos minutos.",
+    );
   }
 
   async function fetchManifest() {
-    const manifest = await fetchJson(`${MANIFEST_URL}?t=${Date.now()}`);
+    const manifest = await fetchJsonFromSources("manifest.json", {
+      cache: "no-store",
+      timeoutMs: 20000,
+    });
     if (!manifest || !manifest.updated_at || !manifest.columns) {
       throw new Error("El manifiesto de datos tiene un formato inesperado.");
     }
@@ -251,27 +316,20 @@
   }
 
   async function fetchChunk(prefix, manifest) {
-    const url = `${DATA_BASE}/chunks/${prefix}.json?v=${encodeURIComponent(manifest.updated_at)}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-    try {
-      const response = await fetch(url, { cache: "force-cache", signal: controller.signal });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`No se pudo descargar el bloque ${prefix} (HTTP ${response.status}).`);
-      const payload = await response.json();
-      if (!Array.isArray(payload.records) || !Array.isArray(payload.columns)) {
-        throw new Error(`El bloque ${prefix} no tiene la estructura de datos esperada.`);
-      }
-      if (payload.prefix && String(payload.prefix) !== prefix) {
-        throw new Error(`El bloque recibido no corresponde al prefijo ${prefix}.`);
-      }
-      return payload;
-    } catch (error) {
-      if (error.name === "AbortError") throw new Error(`La descarga del bloque ${prefix} tardó demasiado. Comprueba tu conexión e inténtalo nuevamente.`);
-      throw error;
-    } finally {
-      clearTimeout(timeout);
+    const payload = await fetchJsonFromSources(`chunks/${prefix}.json`, {
+      cache: "force-cache",
+      version: manifest.updated_at,
+      missingIsNull: true,
+      timeoutMs: 30000,
+    });
+    if (payload === null) return null;
+    if (!Array.isArray(payload.records) || !Array.isArray(payload.columns)) {
+      throw new Error(`El bloque ${prefix} no tiene la estructura de datos esperada.`);
     }
+    if (payload.prefix && String(payload.prefix) !== prefix) {
+      throw new Error(`El bloque recibido no corresponde al prefijo ${prefix}.`);
+    }
+    return payload;
   }
 
   function columnIndex(columns, name, fallback) {

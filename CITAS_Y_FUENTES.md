@@ -19,3 +19,12 @@ El script de generación del repositorio citado particiona el padrón por los pr
 
 - SheetJS Community Edition, documentación oficial de scripts para navegador: https://docs.sheetjs.com/docs/getting-started/installation/standalone/
 - Versión fijada: 0.20.3
+
+## Respaldo de descarga
+
+La aplicación utiliza como respaldo los archivos públicos de GitHub Raw:
+
+- https://raw.githubusercontent.com/alb3rt0ru1z/tribio-padron-ruc/main/manifest.json
+- https://raw.githubusercontent.com/alb3rt0ru1z/tribio-padron-ruc/main/chunks/20506.json (ejemplo de fragmento)
+
+El respaldo se usa únicamente cuando la descarga principal mediante jsDelivr falla.
