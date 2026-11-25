@@ -380,6 +380,34 @@
     return index >= 0 ? index : fallback;
   }
 
+  function formatEstado(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return raw;
+
+    const normalized = normalizeText(raw);
+    let label = "";
+
+    // Los estados de baja pueden incluir una fecha completa en el padrón.
+    // Para la entrega mostramos únicamente el año, manteniendo el resto
+    // de los estados exactamente como aparecen en la fuente.
+    if (
+      normalized.includes("BAJAPROVPOROFICIO") ||
+      normalized.includes("BAJAPROVISIONALPOROFICIO") ||
+      normalized.includes("BAJAPROVISIONALDEOFICIO") ||
+      normalized.includes("BAJAPROVISIONALOFICIO")
+    ) {
+      label = "BAJA PROV. POR OFICIO";
+    } else if (normalized.includes("BAJADEOFICIO")) {
+      label = "BAJA DE OFICIO";
+    } else if (normalized.includes("BAJADEFINITIVA")) {
+      label = "BAJA DEFINITIVA";
+    }
+
+    if (!label) return raw;
+    const year = raw.match(/(?:19|20)\d{2}/)?.[0];
+    return year ? `${label} DESDE ${year}` : raw;
+  }
+
   function recordToData(record, columns) {
     const ruc = columnIndex(columns, "ruc", 0);
     const name = columnIndex(columns, "razon_social", 1);
@@ -396,7 +424,7 @@
     return {
       ruc: String(record[ruc] ?? ""),
       razon_social: String(record[name] ?? ""),
-      estado: String(record[status] ?? ""),
+      estado: formatEstado(record[status]),
       condicion: String(record[condition] ?? ""),
       domicilio: parts.join(", "),
     };
@@ -447,7 +475,7 @@
   function classifyMatch(match) {
     const normalizedState = normalizeText(match.estado);
     if (normalizedState === "NUMINTERNOIDENTIF") return "Identificador interno";
-    if (normalizedState === "BAJADEFINITIVA") return "BAJA DEFINITIVA";
+    if (normalizedState.startsWith("BAJADEFINITIVA")) return "BAJA DEFINITIVA";
     return "Encontrado";
   }
 
